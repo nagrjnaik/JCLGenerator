@@ -26,10 +26,8 @@
       </div>
     </div>
     <div class="header-actions">
-      <span class="status-pill" id="offlineBadge">● Local Offline Ready</span>
-      <button type="button" class="btn btn-secondary" id="resetAllBtn">
-        Reset Defaults
-      </button>
+      <span class="status-pill" id="offlineBadge"><span class="status-dot"></span> Local generation</span>
+      <button type="button" class="btn btn-secondary reset-button" id="resetAllBtn"><span aria-hidden="true">↺</span> Reset defaults</button>
       <button type="button" class="btn btn-secondary theme-toggle" id="darkModeToggle" title="Switch to dark mode" aria-label="Switch to dark mode"><span class="theme-icon" aria-hidden="true">◐</span><span id="themeToggleLabel">Dark mode</span></button>
     </div>
   </header>
@@ -475,8 +473,9 @@
           </div>
 
           <!-- Code Output -->
+          <div class="jcl-editor-toolbar"><span class="editor-label"><span class="editor-dot"></span> JCL editor</span><span class="editor-hint">Editable · changes apply to download</span><button type="button" class="btn btn-sm btn-secondary" id="revertJclBtn">Revert generated</button></div>
           <div class="jcl-editor-wrapper">
-            <pre id="jclPreviewOutput" class="jcl-code"></pre>
+            <textarea id="jclPreviewOutput" class="jcl-code" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Editable generated JCL" wrap="off" placeholder="Generated JCL will appear here…"></textarea>
           </div>
 
           <!-- Validation & Status Footer -->
