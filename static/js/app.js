@@ -4,7 +4,6 @@
 
 const state = {
   utilities: {},
-  templates: {},
   selectedUtility: "IEFBR14",
   dds: [],
   stepQueue: [],
@@ -57,17 +56,15 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;");
 }
 
-// Initialize app by loading utility metadata & templates from Python backend
+// Initialize app by loading utility metadata from the local Python backend
 async function initApp() {
   try {
     const res = await fetch("/api/utilities");
     const data = await res.json();
     state.utilities = data.utilities || {};
-    state.templates = data.templates || {};
     renderUtilityRadioButtons();
     selectUtility("IEFBR14");
     bindGlobalEvents();
-    populateTemplateModal();
   } catch (err) {
     console.error("Failed to initialize from backend:", err);
   }
@@ -408,11 +405,21 @@ async function triggerGenerateJcl() {
       }),
     });
     const data = await res.json();
+    if (!res.ok) {
+      state.lastGeneratedJcl = "";
+      renderJclPreview({ jcl: "", file_name: "job.jcl", warnings: [data.error || "Unable to generate JCL."] });
+      return;
+    }
     state.lastGeneratedJcl = data.jcl || "";
     state.lastFileName = data.file_name || "job.jcl";
     renderJclPreview(data);
   } catch (err) {
     console.error("Failed to generate JCL:", err);
+    const status = el("validationStatus");
+    if (status) {
+      status.className = "validation-warn";
+      status.textContent = "Unable to generate JCL. Check the input values and try again.";
+    }
   }
 }
 
@@ -492,268 +499,18 @@ function renderStepQueue() {
   });
 }
 
-// Populate and wire the Python Template Inspector Modal
-function populateTemplateModal() {
-  const select = el("templateFileSelect");
-  select.innerHTML = "";
-  const names = Object.keys(state.templates);
-  names.forEach((name) => {
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
-    select.appendChild(opt);
-  });
-  if (names.length > 0) {
-    el("templateContentEditor").value = state.templates[names[0]] || "";
-  }
-}
-
-// Bind all UI event listeners
-function bindGlobalEvents() {
-  // Sync Job Name to default output filename if filename wasn't manually customized
-  el("jobName").addEventListener("input", () => {
-    const clean = el("jobName").value.trim().toLowerCase() || "job";
-    el("fileName").value = `${clean}.jcl`;
-    triggerGenerateJcl();
-  });
-
-  // Enable/disable paired inputs when Job Card toggles change
-  const togglePairs = [
-    ["useAcct", "acctInfo"],
-    ["usePgmr", "pgmrName"],
-    ["useClass", "jobClass"],
-    ["useMsgclass", "msgclass"],
-    ["useMsglevel", "msglevel"],
-    ["useNotify", "notify"],
-    ["useRegion", "region"],
-    ["useTime", "timeVal"],
-    ["useTyprun", "typrun"],
-    ["useRestart", "restart"],
-    ["useJcllib", "jcllibDsn"],
-  ];
-
-  togglePairs.forEach(([chkId, inputId]) => {
-    const chk = el(chkId);
-    const inp = el(inputId);
-    if (!chk || !inp) return;
-    inp.disabled = !chk.checked;
-    chk.addEventListener("change", () => {
-      inp.disabled = !chk.checked;
-      triggerGenerateJcl();
-    });
-    inp.addEventListener("input", triggerGenerateJcl);
-    inp.addEventListener("change", triggerGenerateJcl);
-  });
-
-  // Conditional execution toggles
-  el("useCond").addEventListener("change", (e) => {
-    el("condConfigBody").classList.toggle("hidden", !e.target.checked);
-    triggerGenerateJcl();
-  });
-
-  el("condType").addEventListener("change", (e) => {
-    const isCode = e.target.value === "CODE";
-    el("condRcGroup").classList.toggle("hidden", !isCode);
-    el("condOpGroup").classList.toggle("hidden", !isCode);
-    el("condStepGroup").classList.toggle("hidden", !isCode);
-    triggerGenerateJcl();
-  });
-
-  el("useIfElse").addEventListener("change", (e) => {
-    el("ifElseConfigBody").classList.toggle("hidden", !e.target.checked);
-    triggerGenerateJcl();
-  });
-
-  el("ifPreset").addEventListener("change", (e) => {
-    el("ifCondition").value = e.target.value;
-    triggerGenerateJcl();
-  });
-
-  el("includeElse").addEventListener("change", (e) => {
-    el("elseBranchFields").classList.toggle("hidden", !e.target.checked);
-    triggerGenerateJcl();
-  });
-
-  // General step fields
-  [
-    "fileName",
-    "jobDesc",
-    "stepName",
-    "sysprintDd",
-    "sysinDd",
-    "sysoutClass",
-    "programName",
-    "parmVal",
-    "steplibDsn",
-    "updteParm",
-    "condRc",
-    "condOp",
-    "condStep",
-    "ifLabel",
-    "ifCondition",
-    "elseStepName",
-    "elsePgm",
-    "elseDdDsn",
-    "elseComment",
-    "sysinCards",
-  ].forEach((id) => {
-    const node = el(id);
-    if (node) {
-      node.addEventListener("input", triggerGenerateJcl);
-      node.addEventListener("change", triggerGenerateJcl);
-    }
-  });
-
-  // Add DD Statement button
-  el("addDdBtn").addEventListener("click", () => {
-    const nextNum = state.dds.length + 1;
-    state.dds.push({
-      dd_name: `DD${nextNum}`,
-      dsn: `PROD.USER.DATASET.FILE0${nextNum}`,
-      disp_status: "SHR",
-      disp_normal: "",
-      disp_abnormal: "",
-      include_space: false,
-      space_unit: "CYL",
-      space_pri: "10",
-      space_sec: "5",
-      space_dir: "0",
-      include_dcb: false,
-      recfm: "FB",
-      lrecl: "80",
-      blksize: "0",
-      unit: "SYSDA",
-      vol_ser: "",
-      dsntype: "",
-      dummy: false,
-      sysout: "",
-    });
-    renderDdList();
-    triggerGenerateJcl();
-  });
-
-  // SYSIN Control Card Snippet selector
-  el("sysinSnippetSelect").addEventListener("change", (e) => {
-    const key = e.target.value;
-    if (key && SYSIN_SNIPPETS[key] !== undefined) {
-      el("sysinCards").value = SYSIN_SNIPPETS[key];
-      triggerGenerateJcl();
-    }
-    e.target.value = "";
-  });
-
-  // Multi-step queue buttons
-  el("addStepToQueueBtn").addEventListener("click", () => {
-    const stepCopy = collectCurrentStep();
-    state.stepQueue.push(stepCopy);
-    // Auto-increment step name for convenience
-    const nextIdx = (state.stepQueue.length + 1) * 10;
-    el("stepName").value = `STEP${String(nextIdx).padStart(3, "0")}`;
-    renderStepQueue();
-    triggerGenerateJcl();
-  });
-
-  el("clearQueueBtn").addEventListener("click", () => {
-    state.stepQueue = [];
-    renderStepQueue();
-    triggerGenerateJcl();
-  });
-
-  // Copy JCL button
-  el("copyJclBtn").addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(state.lastGeneratedJcl);
-      showToast("Copied JCL to clipboard!");
-    } catch {
-      showToast("Copy complete!");
-    }
-  });
-
-  // Save JCL to local server directory (`generated_jcl/`)
-  el("saveServerBtn").addEventListener("click", async () => {
-    const jobConfig = collectJobConfig();
-    const currentStep = collectCurrentStep();
-    const stepsToRender =
-      state.stepQueue.length > 0 ? state.stepQueue : [currentStep];
-
-    const res = await fetch("/api/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        job_config: jobConfig,
-        steps: stepsToRender,
-      }),
-    });
-    const data = await res.json();
-    if (data.saved_path) {
-      showToast(`Saved: ${data.saved_path}`);
-    }
-  });
-
-  // Download .JCL file directly in browser
-  el("downloadJclBtn").addEventListener("click", () => {
-    const blob = new Blob([state.lastGeneratedJcl], {
-      type: "text/plain;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = state.lastFileName || "job.jcl";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast(`Downloaded ${state.lastFileName}`);
-  });
-
-  // Reset all button
-  el("resetAllBtn").addEventListener("click", () => {
-    state.stepQueue = [];
-    renderStepQueue();
-    selectUtility("IEFBR14");
-  });
-
-  // Templates Modal open/close/save
-  el("openTemplatesBtn").addEventListener("click", () => {
-    el("templatesModal").classList.remove("hidden");
-  });
-
-  el("closeTemplatesBtn").addEventListener("click", () => {
-    el("templatesModal").classList.add("hidden");
-  });
-
-  el("templateFileSelect").addEventListener("change", (e) => {
-    const name = e.target.value;
-    el("templateContentEditor").value = state.templates[name] || "";
-  });
-
-  el("saveTemplateBtn").addEventListener("click", async () => {
-    const tplName = el("templateFileSelect").value;
-    const content = el("templateContentEditor").value;
-    const res = await fetch("/api/templates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ template_name: tplName, content }),
-    });
-    const data = await res.json();
-    if (data.status === "ok") {
-      state.templates = data.templates;
-      el("templateSaveMsg").textContent = `✓ Updated ${tplName}`;
-      setTimeout(() => {
-        el("templateSaveMsg").textContent = "";
-      }, 3000);
-      triggerGenerateJcl();
-    }
-  });
-
   // Dark mode toggle
   const dmBtn = el("darkModeToggle");
   if (dmBtn) {
     const root = document.documentElement;
     const updateIcon = () => {
       const isDark = root.getAttribute("data-theme") === "dark";
-      dmBtn.textContent = isDark ? "☀️" : "🌙";
-      dmBtn.title = isDark ? "Switch to Light Mode" : "Switch to Dark Mode";
+      const label = el("themeToggleLabel");
+      const icon = dmBtn.querySelector(".theme-icon");
+      if (label) label.textContent = isDark ? "Light mode" : "Dark mode";
+      if (icon) icon.textContent = isDark ? "☀" : "◐";
+      dmBtn.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
+      dmBtn.title = isDark ? "Switch to light mode" : "Switch to dark mode";
     };
     updateIcon();
     dmBtn.addEventListener("click", () => {
