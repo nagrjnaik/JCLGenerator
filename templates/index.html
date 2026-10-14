@@ -22,18 +22,15 @@
       <div class="brand-badge">z/OS</div>
       <div>
         <h1>JCL Generator Studio</h1>
-        <p class="subtitle">Offline Python + Web UI Mainframe Job Control Language Builder</p>
+        <p class="subtitle">Build, validate and download mainframe job control language</p>
       </div>
     </div>
     <div class="header-actions">
       <span class="status-pill" id="offlineBadge">● Local Offline Ready</span>
-      <button type="button" class="btn btn-secondary" id="openTemplatesBtn" title="View or customize .jcl.tpl files">
-        Template Files (.tpl)
-      </button>
       <button type="button" class="btn btn-secondary" id="resetAllBtn">
         Reset Defaults
       </button>
-      <button type="button" id="darkModeToggle" title="Toggle dark / light mode" aria-label="Toggle dark mode">🌙</button>
+      <button type="button" class="btn btn-secondary theme-toggle" id="darkModeToggle" title="Switch to dark mode" aria-label="Switch to dark mode"><span class="theme-icon" aria-hidden="true">◐</span><span id="themeToggleLabel">Dark mode</span></button>
     </div>
   </header>
 
@@ -468,7 +465,6 @@
             </div>
             <div class="preview-actions">
               <button type="button" class="btn btn-sm btn-secondary" id="copyJclBtn">Copy JCL</button>
-              <button type="button" class="btn btn-sm btn-secondary" id="saveServerBtn">Save to Server</button>
               <button type="button" class="btn btn-sm btn-primary" id="downloadJclBtn">Download .JCL</button>
             </div>
           </div>
@@ -497,33 +493,6 @@
   <footer class="app-footer">
     Developed by <strong>Nagraj Naik</strong> &nbsp;·&nbsp; IBM z/OS JCL Generator Studio &nbsp;·&nbsp; 100% Local Offline
   </footer>
-
-  <!-- Modal for Template Files -->
-  <div class="modal-backdrop hidden" id="templatesModal">
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <h3>Python JCL Template Files (<code>jcl_templates/*.jcl.tpl</code>)</h3>
-        <button type="button" class="btn-close" id="closeTemplatesBtn">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p class="help-hint">
-          All JCL generation in the Python backend is driven by these modular template files. Select any template below to inspect or customize its placeholders.
-        </p>
-        <div class="form-row two-col">
-          <div class="form-group">
-            <label for="templateFileSelect">Select Template File</label>
-            <select id="templateFileSelect" class="mono-input"></select>
-          </div>
-          <div class="form-group template-save-col">
-            <button type="button" class="btn btn-primary" id="saveTemplateBtn">Save Template Changes</button>
-            <span id="templateSaveMsg" class="save-toast"></span>
-          </div>
-        </div>
-        <textarea id="templateContentEditor" rows="14" class="mono-textarea"></textarea>
-      </div>
-    </div>
-  </div>
-
   <script src="/static/js/app.js"></script>
 </body>
 </html>
