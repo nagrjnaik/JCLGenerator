@@ -4,7 +4,6 @@
    Light (default) + Dark mode via [data-theme="dark"]
    ========================================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ── Light Mode Tokens (Default) ─────────────────────────────────────── */
 :root {
