@@ -8,6 +8,7 @@ const state = {
   dds: [],
   stepQueue: [],
   lastGeneratedJcl: "",
+  generatedJclBaseline: "",
   lastFileName: "jclgen01.jcl",
 };
 
@@ -426,37 +427,33 @@ async function triggerGenerateJcl() {
 // Syntax-highlight and render JCL lines with line numbers
 function renderJclPreview(data) {
   const rawJcl = data.jcl || "";
-  const lines = rawJcl.replace(/\n$/, "").split("\n");
-  const htmlLines = lines.map((line, idx) => {
-    const lineNo = String(idx + 1).padStart(3, " ");
-    let cls = "jcl-content";
-    if (line.startsWith("//*")) {
-      cls += " jcl-comment";
-    } else if (/^\/\/[A-Z0-9@#$]{1,8}\s+JOB\s/.test(line)) {
-      cls += " jcl-job";
-    } else if (/^\/\/[A-Z0-9@#$]{0,8}\s+(IF|ELSE|ENDIF)\b/.test(line)) {
-      cls += " jcl-if";
-    } else if (/^\/\/[A-Z0-9@#$]{1,8}\s+EXEC\s/.test(line)) {
-      cls += " jcl-exec";
-    }
-    return `<div class="jcl-line"><span class="jcl-lineno">${lineNo}</span><span class="${cls}">${escapeHtml(line)}</span></div>`;
-  });
-
-  el("jclPreviewOutput").innerHTML = htmlLines.join("");
-  el("previewMeta").textContent = `${data.line_count || lines.length} lines • ${
-    data.step_count || 1
-  } step(s) • Output: ${data.file_name}`;
-
+  const output = el("jclPreviewOutput");
+  output.value = rawJcl;
+  state.lastGeneratedJcl = rawJcl;
+  state.generatedJclBaseline = rawJcl;
+  state.lastFileName = data.file_name || state.lastFileName || "job.jcl";
+  updateEditorMeta(data);
   const valEl = el("validationStatus");
   if (data.warnings && data.warnings.length > 0) {
     valEl.className = "validation-warn";
-    valEl.textContent = `⚠ ${data.warnings[0]}`;
+    valEl.textContent = "Warning: " + data.warnings[0];
   } else {
     valEl.className = "validation-ok";
-    valEl.textContent = "✓ Valid z/OS 71-column JCL formatting";
+    valEl.textContent = "Generated JCL — edit as needed before download";
   }
 }
 
+function updateEditorMeta(data = {}) {
+  const value = el("jclPreviewOutput").value;
+  const lines = value.split("\n");
+  const longest = lines.reduce((max, line) => Math.max(max, line.length), 0);
+  const edited = value !== (state.generatedJclBaseline || "");
+  el("previewMeta").textContent = lines.length + " lines • " + Math.max(1, state.stepQueue.length + 1) + " step(s) • " + (edited ? "Edited locally" : "Ready to edit") + " • " + state.lastFileName;
+  const valEl = el("validationStatus");
+  if (longest > 71) { valEl.className = "validation-warn"; valEl.textContent = "Warning: longest line is " + longest + " columns; review before submitting"; }
+  else if (edited) { valEl.className = "validation-warn"; valEl.textContent = "Local edits detected — review JCL syntax before submitting"; }
+  else if (!data.warnings || !data.warnings.length) { valEl.className = "validation-ok"; valEl.textContent = "JCL generated — ready for review"; }
+}
 // Render multi-step queue items
 function renderStepQueue() {
   const container = el("stepQueueContainer");
@@ -650,10 +647,22 @@ function bindGlobalEvents() {
     triggerGenerateJcl();
   });
 
+  // Browser-only editing: manual changes are used by copy and download.
+  el("jclPreviewOutput").addEventListener("input", () => {
+    state.lastGeneratedJcl = el("jclPreviewOutput").value;
+    updateEditorMeta();
+  });
+  el("revertJclBtn").addEventListener("click", () => {
+    el("jclPreviewOutput").value = state.generatedJclBaseline || "";
+    state.lastGeneratedJcl = el("jclPreviewOutput").value;
+    updateEditorMeta();
+    showToast("Reverted to generated JCL.");
+  });
+
   // Copy JCL button
   el("copyJclBtn").addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(state.lastGeneratedJcl);
+      await navigator.clipboard.writeText(el("jclPreviewOutput").value);
       showToast("Copied JCL to clipboard!");
     } catch {
       showToast("Clipboard access is unavailable in this browser.");
@@ -662,13 +671,9 @@ function bindGlobalEvents() {
 
   // Download .JCL file directly in browser
   el("downloadJclBtn").addEventListener("click", () => {
-    if (!state.lastGeneratedJcl) {
-      showToast("There is no JCL to download. Fix validation errors first.");
-      return;
-    }
-    const blob = new Blob([state.lastGeneratedJcl], {
-      type: "text/plain;charset=utf-8",
-    });
+    const editedJcl = el("jclPreviewOutput").value;
+    if (!editedJcl.trim()) { showToast("There is no JCL to download. Generate a job first."); return; }
+    const blob = new Blob([editedJcl], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
