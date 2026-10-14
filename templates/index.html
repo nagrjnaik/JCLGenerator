@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IBM z/OS JCL Generator — Offline Studio</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <!-- Apply saved theme before paint to avoid flash -->
+  <script>
+    (function () {
+      try {
+        const t = localStorage.getItem("jcl-theme");
+        if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+      } catch (_) {}
+    })();
+  </script>
+</head>
+<body>
+  <!-- Top Header Bar -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-badge">z/OS</div>
+      <div>
+        <h1>JCL Generator Studio</h1>
+        <p class="subtitle">Offline Python + Web UI Mainframe Job Control Language Builder</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="status-pill" id="offlineBadge">● Local Offline Ready</span>
+      <button type="button" class="btn btn-secondary" id="openTemplatesBtn" title="View or customize .jcl.tpl files">
+        Template Files (.tpl)
+      </button>
+      <button type="button" class="btn btn-secondary" id="resetAllBtn">
+        Reset Defaults
+      </button>
+      <button type="button" id="darkModeToggle" title="Toggle dark / light mode" aria-label="Toggle dark mode">🌙</button>
+    </div>
+  </header>
+
+  <!-- Main Workspace Grid -->
+  <main class="workspace">
+    <!-- Left Column: Configuration Controls -->
+    <section class="builder-column">
+
+      <!-- 1. JOB CARD & FILE SETTINGS -->
+      <div class="card">
+        <div class="card-header">
+          <h2>1. Job Card &amp; Output File Parameters</h2>
+          <span class="badge">JOB Statement</span>
+        </div>
+        <div class="card-body">
+          <div class="form-row three-col">
+            <div class="form-group">
+              <label for="jobName">Job Name (1–8 chars)</label>
+              <input type="text" id="jobName" maxlength="8" value="JCLGEN01" placeholder="e.g. JCLGEN01" class="mono-input" />
+            </div>
+            <div class="form-group">
+              <label for="fileName">Output File Name</label>
+              <input type="text" id="fileName" value="jclgen01.jcl" placeholder="e.g. myjob.jcl" class="mono-input" />
+            </div>
+            <div class="form-group">
+              <label for="jobDesc">Job Header Comment / Description</label>
+              <input type="text" id="jobDesc" maxlength="50" value="BATCH UTILITY JOB GENERATED VIA WEB UI" />
+            </div>
+          </div>
+
+          <div class="divider-label">Job Card Toggles &amp; Parameter Values</div>
+
+          <div class="toggle-grid">
+            <!-- Job Accounting Info Toggle -->
+            <div class="toggle-card">
+              <label class="switch-label">
+                <input type="checkbox" id="useAcct" checked />
+                <span class="switch-slider"></span>
+                <span class="toggle-title">Accounting Info</span>
+              </label>
+              <input type="text" id="acctInfo" value="ACCT001,DEPT10" placeholder="ACCT123,DEPT01" class="mono-input" />
+            </div>
+
+            <!-- Programmer Name Toggle -->
+            <div class="toggle-card">
+              <label class="switch-label">
+                <input type="checkbox" id="usePgmr" checked />
+                <span class="switch-slider"></span>
+                <span class="toggle-title">Programmer Name</span>
+              </label>
+              <input type="text" id="pgmrName" maxlength="20" value="NAGRAJ NAIK" placeholder="JOHN DOE" class="mono-input" />
+            </div>
+
+            <!-- CLASS Toggle -->
+            <div class="toggle-card">
+              <label class="switch-label">
+                <input type="checkbox" id="useClass" checked />
+                <span class="switch-slider"></span>
+                <span class="toggle-title">CLASS=</span>
+              </label>
+              <select id="jobClass" class="mono-input">
+                <option value="A" selected>A (Default Batch)</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="P">P (Production)</option>
+                <option value="T">T (Test)</option>
+                <option value="0">0</option>
+                <option value="1">1</option>
+              </select>
+            </div>
+
+            <!-- MSGCLASS Toggle -->
+            <div class="toggle-card">
+              <label class="switch-label">
+                <input type="checkbox" id="useMsgclass" checked />
+                <span class="switch-slider"></span>
+                <span class="toggle-title">MSGCLASS=</span>
+              </label>
+              <select id="msgclass" class="mono-input">
+                <option value="X" selected>X (Held Output)</option>
+                <option value="A">A (System Printer)</option>
+                <option value="H">H (Held Queue)</option>
+                <option value="K">K</option>
+                <option value="T">T</option>
+                <option value="0">0</option>
+              </select>
+            </div>
+
+            <!-- MSGLEVEL Toggle -->
+            <div class="toggle-card">
+              <label class="switch-label">
+                <input type="checkbox" id="useMsglevel" checked />
+                <span class="switch-slider"></span>
+                <span class="toggle-title">MSGLEVEL=</span>
+              </label>
+              <select id="msglevel" class="mono-input">
+                <option value="(1,1)" selected>(1,1) — All JCL &amp; Msgs</option>
+                <option value="(1,0)">(1,0) — All JCL, No Alloc</option>
+                <option value="(0,0)">(0,0) — Job Card Only</option>
+                <option value="(2,1)">(2,1) — Input JCL &amp; Msgs</option>
+              </select>
+            </div>
+
+            <!-- NOTIFY Toggle -->
+            <div class="toggle-card">
+              <label class="switch-label">
+                <input type="checkbox" id="useNotify" checked />
+                <span class="switch-slider"></span>
+                <span class="toggle-title">NOTIFY=</span>
+              </label>
+              <input type="text" id="notify" value="&amp;SYSUID" placeholder="&amp;SYSUID or TSOID" class="mono-input" />
+            </div>
+
+            <!-- REGION Toggle -->
+            <div class="toggle-card">
+              <label class="switch-label">
+                <input type="checkbox" id="useRegion" />
+                <span class="switch-slider"></span>
+                <span class="toggle-title">REGION=</span>
+              </label>
+              <select id="region" class="mono-input">
+                <option value="0M" selected>0M (Unlimited)</option>
+                <option value="4M">4M</option>
+                <option value="8M">8M</option>
+                <option value="16M">16M</option>
+                <option value="64M">64M</option>
+                <option value="512K">512K</option>
+              </select>
+            </div>
+
+            <!-- TIME Toggle -->
+            <div class="toggle-card">
+              <label class="switch-label">
+                <input type="checkbox" id="useTime" />
+                <span class="switch-slider"></span>
+                <span class="toggle-title">TIME=</span>
+              </label>
+              <select id="timeVal" class="mono-input">
+                <option value="(0,30)" selected>(0,30) — 30 Secs</option>
+                <option value="(1,0)">(1,0) — 1 Min</option>
+                <option value="(5,0)">(5,0) — 5 Mins</option>
+                <option value="1440">1440 (No Limit)</option>
+                <option value="NOLIMIT">NOLIMIT</option>
+              </select>
+            </div>
+
+            <!-- TYPRUN Toggle -->
+            <div class="toggle-card">
+              <label class="switch-label">
+                <input type="checkbox" id="useTyprun" />
+                <span class="switch-slider"></span>
+                <span class="toggle-title">TYPRUN=</span>
+              </label>
+              <select id="typrun" class="mono-input">
+                <option value="SCAN" selected>SCAN (Syntax Check Only)</option>
+                <option value="HOLD">HOLD (Hold Job Execution)</option>
+                <option value="JCLHOLD">JCLHOLD</option>
+                <option value="COPY">COPY</option>
+              </select>
+            </div>
+
+            <!-- RESTART Toggle -->
+            <div class="toggle-card">
+              <label class="switch-label">
+                <input type="checkbox" id="useRestart" />
+                <span class="switch-slider"></span>
+                <span class="toggle-title">RESTART=</span>
+              </label>
+              <input type="text" id="restart" maxlength="8" value="STEP010" placeholder="Step Name" class="mono-input" />
+            </div>
+
+            <!-- JCLLIB Toggle -->
+            <div class="toggle-card span-two">
+              <label class="switch-label">
+                <input type="checkbox" id="useJcllib" />
+                <span class="switch-slider"></span>
+                <span class="toggle-title">JCLLIB ORDER=</span>
+              </label>
+              <input type="text" id="jcllibDsn" value="PROD.APPL.PROCLIB" placeholder="PROD.APPL.PROCLIB" class="mono-input" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. RADIO BUTTONS FOR UTILITIES -->
+      <div class="card">
+        <div class="card-header">
+          <h2>2. Select Mainframe Utility (Radio Buttons)</h2>
+          <span class="badge" id="activeUtilityBadge">IEFBR14</span>
+        </div>
+        <div class="card-body">
+          <div class="utility-radio-grid" id="utilityRadioGrid">
+            <!-- Populated dynamically from UTILITY_METADATA -->
+          </div>
+          <div class="utility-description-box" id="utilityDescriptionBox">
+            Select a utility above to load its JCL template, default DD statements, and control cards.
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. STEP CUSTOMIZATION & CONDITIONAL LOGIC -->
+      <div class="card">
+        <div class="card-header">
+          <h2>3. Step Customization &amp; Conditional Logic (IF/ELSE &amp; COND)</h2>
+          <span class="badge">EXEC &amp; Conditions</span>
+        </div>
+        <div class="card-body">
+          <div class="form-row four-col">
+            <div class="form-group">
+              <label for="stepName">Step Label / Name</label>
+              <input type="text" id="stepName" maxlength="8" value="STEP010" class="mono-input" />
+            </div>
+            <div class="form-group">
+              <label for="sysprintDd">SYSPRINT DD Label</label>
+              <input type="text" id="sysprintDd" maxlength="8" value="SYSPRINT" class="mono-input" />
+            </div>
+            <div class="form-group">
+              <label for="sysinDd">SYSIN DD Label</label>
+              <input type="text" id="sysinDd" maxlength="8" value="SYSIN" class="mono-input" />
+            </div>
+            <div class="form-group">
+              <label for="sysoutClass">SYSOUT Class</label>
+              <select id="sysoutClass" class="mono-input">
+                <option value="*" selected>* (Match MSGCLASS)</option>
+                <option value="A">A</option>
+                <option value="X">X</option>
+                <option value="H">H</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Extra Program Options (Shown for CUSTOM or IEBUPDTE) -->
+          <div class="form-row three-col hidden" id="customPgmRow">
+            <div class="form-group">
+              <label for="programName">Program Name (PGM=)</label>
+              <input type="text" id="programName" maxlength="8" value="MYCOBOL" class="mono-input" />
+            </div>
+            <div class="form-group">
+              <label for="parmVal">EXEC PARM= String</label>
+              <input type="text" id="parmVal" value="" placeholder="e.g. RPT=DAILY,MODE=1" class="mono-input" />
+            </div>
+            <div class="form-group">
+              <label for="steplibDsn">STEPLIB DSN (Optional)</label>
+              <input type="text" id="steplibDsn" value="PROD.APPL.LOADLIB" placeholder="PROD.APPL.LOADLIB" class="mono-input" />
+            </div>
+          </div>
+
+          <div class="form-row two-col hidden" id="iebupdteRow">
+            <div class="form-group">
+              <label for="updteParm">IEBUPDTE PARM= Mode</label>
+              <select id="updteParm" class="mono-input">
+                <option value="NEW" selected>NEW (Create New PDS Members)</option>
+                <option value="MOD">MOD (Update Existing or Add Members)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="divider-label">Conditional Execution Toggles</div>
+
+          <div class="conditionals-wrapper">
+            <!-- EXEC COND= Parameter Toggle -->
+            <div class="cond-box">
+              <div class="cond-header">
+                <label class="switch-label">
+                  <input type="checkbox" id="useCond" />
+                  <span class="switch-slider"></span>
+                  <span class="toggle-title">Include EXEC <code>COND=</code> Parameter</span>
+                </label>
+              </div>
+              <div class="cond-body hidden" id="condConfigBody">
+                <div class="form-row four-col">
+                  <div class="form-group">
+                    <label for="condType">Condition Mode</label>
+                    <select id="condType" class="mono-input">
+                      <option value="CODE" selected>(RC, Operator)</option>
+                      <option value="EVEN">COND=EVEN</option>
+                      <option value="ONLY">COND=ONLY</option>
+                    </select>
+                  </div>
+                  <div class="form-group" id="condRcGroup">
+                    <label for="condRc">Return Code (0–4095)</label>
+                    <input type="number" id="condRc" min="0" max="4095" value="4" class="mono-input" />
+                  </div>
+                  <div class="form-group" id="condOpGroup">
+                    <label for="condOp">Operator</label>
+                    <select id="condOp" class="mono-input">
+                      <option value="LT" selected>LT (Less Than)</option>
+                      <option value="LE">LE (Less/Equal)</option>
+                      <option value="EQ">EQ (Equal)</option>
+                      <option value="NE">NE (Not Equal)</option>
+                      <option value="GT">GT (Greater Than)</option>
+                      <option value="GE">GE (Greater/Equal)</option>
+                    </select>
+                  </div>
+                  <div class="form-group" id="condStepGroup">
+                    <label for="condStep">Ref Step (Optional)</label>
+                    <input type="text" id="condStep" maxlength="8" placeholder="e.g. STEP005" class="mono-input" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- IF / THEN / ELSE / ENDIF Construct Toggle -->
+            <div class="cond-box">
+              <div class="cond-header">
+                <label class="switch-label">
+                  <input type="checkbox" id="useIfElse" />
+                  <span class="switch-slider"></span>
+                  <span class="toggle-title">Wrap Step in <code>IF / THEN / ELSE / ENDIF</code> Block</span>
+                </label>
+              </div>
+              <div class="cond-body hidden" id="ifElseConfigBody">
+                <div class="form-row three-col">
+                  <div class="form-group">
+                    <label for="ifLabel">IF Statement Label</label>
+                    <input type="text" id="ifLabel" maxlength="8" value="IFCHK01" class="mono-input" />
+                  </div>
+                  <div class="form-group">
+                    <label for="ifPreset">Quick Condition Preset</label>
+                    <select id="ifPreset" class="mono-input">
+                      <option value="RC = 0" selected>RC = 0 (Previous Step OK)</option>
+                      <option value="RC &lt;= 4">RC &lt;= 4 (Warning or OK)</option>
+                      <option value="STEP010.RC = 0">STEP010.RC = 0 (Specific Step)</option>
+                      <option value="ABEND">ABEND (Step Abended)</option>
+                      <option value="¬ABEND">¬ABEND (Did Not Abend)</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="ifCondition">Custom Relational Expression</label>
+                    <input type="text" id="ifCondition" value="RC = 0" class="mono-input" />
+                  </div>
+                </div>
+
+                <div class="else-subbox">
+                  <label class="switch-label">
+                    <input type="checkbox" id="includeElse" />
+                    <span class="switch-slider"></span>
+                    <span class="toggle-title">Include <code>ELSE</code> Branch Step</span>
+                  </label>
+                  <div class="form-row four-col hidden" id="elseBranchFields">
+                    <div class="form-group">
+                      <label for="elseStepName">ELSE Step Label</label>
+                      <input type="text" id="elseStepName" maxlength="8" value="ERRSTEP" class="mono-input" />
+                    </div>
+                    <div class="form-group">
+                      <label for="elsePgm">ELSE Program (PGM=)</label>
+                      <input type="text" id="elsePgm" maxlength="8" value="IEFBR14" class="mono-input" />
+                    </div>
+                    <div class="form-group">
+                      <label for="elseDdDsn">ELSE Dataset (Optional)</label>
+                      <input type="text" id="elseDdDsn" value="PROD.ERR.FLAG.FILE" class="mono-input" />
+                    </div>
+                    <div class="form-group">
+                      <label for="elseComment">ELSE Comment</label>
+                      <input type="text" id="elseComment" value="FALLBACK STEP ON ERROR" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. DD STATEMENTS -->
+      <div class="card">
+        <div class="card-header">
+          <h2>4. Dataset Definitions (DD Statements — Label, DSN, DISP, SPACE, DCB)</h2>
+          <button type="button" class="btn btn-sm btn-primary" id="addDdBtn">+ Add DD Statement</button>
+        </div>
+        <div class="card-body">
+          <div id="ddListContainer" class="dd-list">
+            <!-- Dynamically rendered DD cards -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. SYSIN / CONTROL CARDS -->
+      <div class="card">
+        <div class="card-header">
+          <h2>5. Control Statements (<code>SYSIN</code> / <code>SYSTSIN</code>)</h2>
+          <div class="header-inline-controls">
+            <select id="sysinSnippetSelect" class="mono-input btn-sm">
+              <option value="">-- Insert Control Card Snippet --</option>
+              <option value="DUMMY">DUMMY (No Control Cards)</option>
+              <option value="SORT_ASC">SORT: Ascending Key (1,10,CH,A)</option>
+              <option value="SORT_DEDUP">SORT: Deduplicate (SUM FIELDS=NONE)</option>
+              <option value="SORT_INCLUDE">SORT: INCLUDE COND Filter</option>
+              <option value="IDCAMS_DEL_DEF">IDCAMS: Delete &amp; Define KSDS Cluster</option>
+              <option value="IDCAMS_REPRO">IDCAMS: REPRO Copy Dataset</option>
+              <option value="IDCAMS_GDG">IDCAMS: Define GDG Base</option>
+              <option value="IEBCOPY_ALL">IEBCOPY: Copy All PDS Members</option>
+              <option value="IEBCOPY_SEL">IEBCOPY: Copy Selected Members</option>
+              <option value="IKJEFT01_DB2">IKJEFT01: Run DB2 COBOL Program</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body">
+          <textarea id="sysinCards" rows="5" class="mono-textarea" placeholder="Enter control statements or DUMMY..."></textarea>
+          <p class="help-hint">Tip: Type <code>DUMMY</code> if the utility requires <code>//SYSIN DD DUMMY</code> (e.g., straight copy in IEBGENER/ICEGENER).</p>
+        </div>
+      </div>
+
+      <!-- Multi-Step Job Queue -->
+      <div class="card">
+        <div class="card-header">
+          <h2>6. Multi-Step Job Queue (Optional)</h2>
+          <div class="header-inline-controls">
+            <button type="button" class="btn btn-sm btn-primary" id="addStepToQueueBtn">+ Add Current Step to Multi-Step Job</button>
+            <button type="button" class="btn btn-sm btn-secondary" id="clearQueueBtn">Clear Queue</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="help-hint">
+            By default, the preview shows your active step immediately. To build a multi-step JCL job, click
+            <strong>"+ Add Current Step to Multi-Step Job"</strong> for each step you configure.
+          </p>
+          <div id="stepQueueContainer" class="step-queue-list"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Right Column: Live JCL Preview -->
+    <aside class="preview-column">
+      <div class="preview-sticky">
+        <div class="card preview-card">
+          <div class="card-header">
+            <div>
+              <h2>Live z/OS JCL Output</h2>
+              <span class="preview-meta" id="previewMeta">0 lines • 1 step • Col 72 OK</span>
+            </div>
+            <div class="preview-actions">
+              <button type="button" class="btn btn-sm btn-secondary" id="copyJclBtn">Copy JCL</button>
+              <button type="button" class="btn btn-sm btn-secondary" id="saveServerBtn">Save to Server</button>
+              <button type="button" class="btn btn-sm btn-primary" id="downloadJclBtn">Download .JCL</button>
+            </div>
+          </div>
+
+          <!-- 80-Column Ruler -->
+          <div class="jcl-ruler" title="Mainframe 80-column card ruler (Columns 1-71 code, Column 72 continuation)">
+            <div class="ruler-numbers">....+....1....+....2....+....3....+....4....+....5....+....6....+....7..|.+....8</div>
+          </div>
+
+          <!-- Code Output -->
+          <div class="jcl-editor-wrapper">
+            <pre id="jclPreviewOutput" class="jcl-code"></pre>
+          </div>
+
+          <!-- Validation & Status Footer -->
+          <div class="preview-footer" id="previewFooter">
+            <span class="validation-ok" id="validationStatus">✓ Valid z/OS 71-column JCL formatting</span>
+            <span id="saveNotification" class="save-toast"></span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    Developed by <strong>Nagraj Naik</strong> &nbsp;·&nbsp; IBM z/OS JCL Generator Studio &nbsp;·&nbsp; 100% Local Offline
+  </footer>
+
+  <!-- Modal for Template Files -->
+  <div class="modal-backdrop hidden" id="templatesModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Python JCL Template Files (<code>jcl_templates/*.jcl.tpl</code>)</h3>
+        <button type="button" class="btn-close" id="closeTemplatesBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="help-hint">
+          All JCL generation in the Python backend is driven by these modular template files. Select any template below to inspect or customize its placeholders.
+        </p>
+        <div class="form-row two-col">
+          <div class="form-group">
+            <label for="templateFileSelect">Select Template File</label>
+            <select id="templateFileSelect" class="mono-input"></select>
+          </div>
+          <div class="form-group template-save-col">
+            <button type="button" class="btn btn-primary" id="saveTemplateBtn">Save Template Changes</button>
+            <span id="templateSaveMsg" class="save-toast"></span>
+          </div>
+        </div>
+        <textarea id="templateContentEditor" rows="14" class="mono-textarea"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
