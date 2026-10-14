@@ -499,6 +499,194 @@ function renderStepQueue() {
   });
 }
 
+// Bind all UI event listeners
+function bindGlobalEvents() {
+  // Sync Job Name to default output filename if filename wasn't manually customized
+  el("jobName").addEventListener("input", () => {
+    const clean = el("jobName").value.trim().toLowerCase() || "job";
+    el("fileName").value = `${clean}.jcl`;
+    triggerGenerateJcl();
+  });
+
+  // Enable/disable paired inputs when Job Card toggles change
+  const togglePairs = [
+    ["useAcct", "acctInfo"],
+    ["usePgmr", "pgmrName"],
+    ["useClass", "jobClass"],
+    ["useMsgclass", "msgclass"],
+    ["useMsglevel", "msglevel"],
+    ["useNotify", "notify"],
+    ["useRegion", "region"],
+    ["useTime", "timeVal"],
+    ["useTyprun", "typrun"],
+    ["useRestart", "restart"],
+    ["useJcllib", "jcllibDsn"],
+  ];
+
+  togglePairs.forEach(([chkId, inputId]) => {
+    const chk = el(chkId);
+    const inp = el(inputId);
+    if (!chk || !inp) return;
+    inp.disabled = !chk.checked;
+    chk.addEventListener("change", () => {
+      inp.disabled = !chk.checked;
+      triggerGenerateJcl();
+    });
+    inp.addEventListener("input", triggerGenerateJcl);
+    inp.addEventListener("change", triggerGenerateJcl);
+  });
+
+  // Conditional execution toggles
+  el("useCond").addEventListener("change", (e) => {
+    el("condConfigBody").classList.toggle("hidden", !e.target.checked);
+    triggerGenerateJcl();
+  });
+
+  el("condType").addEventListener("change", (e) => {
+    const isCode = e.target.value === "CODE";
+    el("condRcGroup").classList.toggle("hidden", !isCode);
+    el("condOpGroup").classList.toggle("hidden", !isCode);
+    el("condStepGroup").classList.toggle("hidden", !isCode);
+    triggerGenerateJcl();
+  });
+
+  el("useIfElse").addEventListener("change", (e) => {
+    el("ifElseConfigBody").classList.toggle("hidden", !e.target.checked);
+    triggerGenerateJcl();
+  });
+
+  el("ifPreset").addEventListener("change", (e) => {
+    el("ifCondition").value = e.target.value;
+    triggerGenerateJcl();
+  });
+
+  el("includeElse").addEventListener("change", (e) => {
+    el("elseBranchFields").classList.toggle("hidden", !e.target.checked);
+    triggerGenerateJcl();
+  });
+
+  // General step fields
+  [
+    "fileName",
+    "jobDesc",
+    "stepName",
+    "sysprintDd",
+    "sysinDd",
+    "sysoutClass",
+    "programName",
+    "parmVal",
+    "steplibDsn",
+    "updteParm",
+    "condRc",
+    "condOp",
+    "condStep",
+    "ifLabel",
+    "ifCondition",
+    "elseStepName",
+    "elsePgm",
+    "elseDdDsn",
+    "elseComment",
+    "sysinCards",
+  ].forEach((id) => {
+    const node = el(id);
+    if (node) {
+      node.addEventListener("input", triggerGenerateJcl);
+      node.addEventListener("change", triggerGenerateJcl);
+    }
+  });
+
+  // Add DD Statement button
+  el("addDdBtn").addEventListener("click", () => {
+    const nextNum = state.dds.length + 1;
+    state.dds.push({
+      dd_name: `DD${nextNum}`,
+      dsn: `PROD.USER.DATASET.FILE0${nextNum}`,
+      disp_status: "SHR",
+      disp_normal: "",
+      disp_abnormal: "",
+      include_space: false,
+      space_unit: "CYL",
+      space_pri: "10",
+      space_sec: "5",
+      space_dir: "0",
+      include_dcb: false,
+      recfm: "FB",
+      lrecl: "80",
+      blksize: "0",
+      unit: "SYSDA",
+      vol_ser: "",
+      dsntype: "",
+      dummy: false,
+      sysout: "",
+    });
+    renderDdList();
+    triggerGenerateJcl();
+  });
+
+  // SYSIN Control Card Snippet selector
+  el("sysinSnippetSelect").addEventListener("change", (e) => {
+    const key = e.target.value;
+    if (key && SYSIN_SNIPPETS[key] !== undefined) {
+      el("sysinCards").value = SYSIN_SNIPPETS[key];
+      triggerGenerateJcl();
+    }
+    e.target.value = "";
+  });
+
+  // Multi-step queue buttons
+  el("addStepToQueueBtn").addEventListener("click", () => {
+    const stepCopy = collectCurrentStep();
+    state.stepQueue.push(stepCopy);
+    // Auto-increment step name for convenience
+    const nextIdx = (state.stepQueue.length + 1) * 10;
+    el("stepName").value = `STEP${String(nextIdx).padStart(3, "0")}`;
+    renderStepQueue();
+    triggerGenerateJcl();
+  });
+
+  el("clearQueueBtn").addEventListener("click", () => {
+    state.stepQueue = [];
+    renderStepQueue();
+    triggerGenerateJcl();
+  });
+
+  // Copy JCL button
+  el("copyJclBtn").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(state.lastGeneratedJcl);
+      showToast("Copied JCL to clipboard!");
+    } catch {
+      showToast("Clipboard access is unavailable in this browser.");
+    }
+  });
+
+  // Download .JCL file directly in browser
+  el("downloadJclBtn").addEventListener("click", () => {
+    if (!state.lastGeneratedJcl) {
+      showToast("There is no JCL to download. Fix validation errors first.");
+      return;
+    }
+    const blob = new Blob([state.lastGeneratedJcl], {
+      type: "text/plain;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = state.lastFileName || "job.jcl";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`Downloaded ${state.lastFileName}`);
+  });
+
+  // Reset all button
+  el("resetAllBtn").addEventListener("click", () => {
+    state.stepQueue = [];
+    renderStepQueue();
+    selectUtility("IEFBR14");
+  });
+
   // Dark mode toggle
   const dmBtn = el("darkModeToggle");
   if (dmBtn) {
