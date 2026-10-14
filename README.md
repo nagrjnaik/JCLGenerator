@@ -12,8 +12,8 @@ A 100% offline, browser-based IBM z/OS Job Control Language (JCL) generator. Con
 - Live 80-column JCL preview with syntax highlighting
 - Strict z/OS column-71 continuation validation
 - Multi-step job queue builder
-- Download or save generated `.jcl` files locally
-- Edit raw `.jcl.tpl` template files directly from the UI
+- Download generated `.jcl` files directly from the browser
+- Edit job parameters and DD statements in the builder; source templates are not editable in the UI
 - **Light & Dark mode** with preference saved across sessions
 - Zero internet required — fully air-gap friendly
 
@@ -70,8 +70,8 @@ jcl/
 ### Step 1 — Clone the Repository
 
 ```bash
-git clone https://github.com/<your-username>/jcl.git
-cd jcl
+git clone https://github.com/nagrjnaik/JCLGenerator.git
+cd JCLGenerator
 ```
 
 ---
@@ -178,7 +178,7 @@ deactivate
 3. **DD Statements** — Adjust DSN, DISP, SPACE, DCB as needed
 4. **SYSIN** — Enter control cards or select a snippet
 5. **Preview** — Live JCL renders in the right panel automatically
-6. **Download / Save** — Click "Download .JCL" or "Save to Server"
+6. **Download** — Click "Download .JCL" to save the generated job to your computer
 
 ---
 

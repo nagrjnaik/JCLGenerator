@@ -4,7 +4,6 @@
 
 const state = {
   utilities: {},
-  templates: {},
   selectedUtility: "IEFBR14",
   dds: [],
   stepQueue: [],
@@ -57,17 +56,15 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;");
 }
 
-// Initialize app by loading utility metadata & templates from Python backend
+// Initialize app by loading utility metadata from the local Python backend
 async function initApp() {
   try {
     const res = await fetch("/api/utilities");
     const data = await res.json();
     state.utilities = data.utilities || {};
-    state.templates = data.templates || {};
     renderUtilityRadioButtons();
     selectUtility("IEFBR14");
     bindGlobalEvents();
-    populateTemplateModal();
   } catch (err) {
     console.error("Failed to initialize from backend:", err);
   }
@@ -408,11 +405,21 @@ async function triggerGenerateJcl() {
       }),
     });
     const data = await res.json();
+    if (!res.ok) {
+      state.lastGeneratedJcl = "";
+      renderJclPreview({ jcl: "", file_name: "job.jcl", warnings: [data.error || "Unable to generate JCL."] });
+      return;
+    }
     state.lastGeneratedJcl = data.jcl || "";
     state.lastFileName = data.file_name || "job.jcl";
     renderJclPreview(data);
   } catch (err) {
     console.error("Failed to generate JCL:", err);
+    const status = el("validationStatus");
+    if (status) {
+      status.className = "validation-warn";
+      status.textContent = "Unable to generate JCL. Check the input values and try again.";
+    }
   }
 }
 
@@ -490,22 +497,6 @@ function renderStepQueue() {
       triggerGenerateJcl();
     });
   });
-}
-
-// Populate and wire the Python Template Inspector Modal
-function populateTemplateModal() {
-  const select = el("templateFileSelect");
-  select.innerHTML = "";
-  const names = Object.keys(state.templates);
-  names.forEach((name) => {
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
-    select.appendChild(opt);
-  });
-  if (names.length > 0) {
-    el("templateContentEditor").value = state.templates[names[0]] || "";
-  }
 }
 
 // Bind all UI event listeners
@@ -665,33 +656,16 @@ function bindGlobalEvents() {
       await navigator.clipboard.writeText(state.lastGeneratedJcl);
       showToast("Copied JCL to clipboard!");
     } catch {
-      showToast("Copy complete!");
-    }
-  });
-
-  // Save JCL to local server directory (`generated_jcl/`)
-  el("saveServerBtn").addEventListener("click", async () => {
-    const jobConfig = collectJobConfig();
-    const currentStep = collectCurrentStep();
-    const stepsToRender =
-      state.stepQueue.length > 0 ? state.stepQueue : [currentStep];
-
-    const res = await fetch("/api/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        job_config: jobConfig,
-        steps: stepsToRender,
-      }),
-    });
-    const data = await res.json();
-    if (data.saved_path) {
-      showToast(`Saved: ${data.saved_path}`);
+      showToast("Clipboard access is unavailable in this browser.");
     }
   });
 
   // Download .JCL file directly in browser
   el("downloadJclBtn").addEventListener("click", () => {
+    if (!state.lastGeneratedJcl) {
+      showToast("There is no JCL to download. Fix validation errors first.");
+      return;
+    }
     const blob = new Blob([state.lastGeneratedJcl], {
       type: "text/plain;charset=utf-8",
     });
@@ -713,47 +687,18 @@ function bindGlobalEvents() {
     selectUtility("IEFBR14");
   });
 
-  // Templates Modal open/close/save
-  el("openTemplatesBtn").addEventListener("click", () => {
-    el("templatesModal").classList.remove("hidden");
-  });
-
-  el("closeTemplatesBtn").addEventListener("click", () => {
-    el("templatesModal").classList.add("hidden");
-  });
-
-  el("templateFileSelect").addEventListener("change", (e) => {
-    const name = e.target.value;
-    el("templateContentEditor").value = state.templates[name] || "";
-  });
-
-  el("saveTemplateBtn").addEventListener("click", async () => {
-    const tplName = el("templateFileSelect").value;
-    const content = el("templateContentEditor").value;
-    const res = await fetch("/api/templates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ template_name: tplName, content }),
-    });
-    const data = await res.json();
-    if (data.status === "ok") {
-      state.templates = data.templates;
-      el("templateSaveMsg").textContent = `✓ Updated ${tplName}`;
-      setTimeout(() => {
-        el("templateSaveMsg").textContent = "";
-      }, 3000);
-      triggerGenerateJcl();
-    }
-  });
-
   // Dark mode toggle
   const dmBtn = el("darkModeToggle");
   if (dmBtn) {
     const root = document.documentElement;
     const updateIcon = () => {
       const isDark = root.getAttribute("data-theme") === "dark";
-      dmBtn.textContent = isDark ? "☀️" : "🌙";
-      dmBtn.title = isDark ? "Switch to Light Mode" : "Switch to Dark Mode";
+      const label = el("themeToggleLabel");
+      const icon = dmBtn.querySelector(".theme-icon");
+      if (label) label.textContent = isDark ? "Light mode" : "Dark mode";
+      if (icon) icon.textContent = isDark ? "☀" : "◐";
+      dmBtn.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
+      dmBtn.title = isDark ? "Switch to light mode" : "Switch to dark mode";
     };
     updateIcon();
     dmBtn.addEventListener("click", () => {

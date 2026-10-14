@@ -542,10 +542,17 @@ def sanitize_jcl_identifier(value: str, default: str = "MYJOB01", max_len: int =
 
 
 def sanitize_dsn(dsn: str) -> str:
-    """Clean and uppercase a dataset name while allowing GDG (+1), member (MEM), and temp &&DSN."""
+    """Normalize a dataset reference and reject control characters or unsupported syntax."""
     if not dsn:
         return "PROD.SAMPLE.DATASET"
-    return str(dsn).strip().upper()
+    value = str(dsn).strip().upper()
+    if any(ch in value for ch in "\r\n\x00"):
+        raise ValueError("Dataset names must be a single line.")
+    if not re.fullmatch(r"(?:&&)?[A-Z0-9@#$][A-Z0-9@#$.-]*(?:\([A-Z0-9@#$]+\))?(?:\([+-]\d+\))?", value):
+        raise ValueError(f"Invalid dataset reference: {value!r}")
+    if len(value) > 54:
+        raise ValueError("Dataset references must not exceed 54 characters.")
+    return value
 
 
 def load_template(template_filename: str) -> Template:
@@ -572,14 +579,23 @@ def wrap_jcl_parameters(prefix: str, params: List[str], cont_indent: str = "//  
         candidate = f"{current_line}{param}{suffix}"
 
         # Column 71 is the max code column in JCL (1-indexed -> length <= 71)
-        if len(candidate) <= 71 or current_line == prefix and len(prefix) + len(param) > 71:
+        if len(candidate) <= 71:
             current_line = candidate
-        else:
-            # Ensure previous line ends with a comma before continuation
-            if not current_line.endswith(","):
-                current_line += ","
-            lines.append(current_line)
-            current_line = f"{cont_indent}{param}{suffix}"
+            continue
+
+        continuation_candidate = f"{cont_indent}{param}{suffix}"
+        if len(continuation_candidate) > 71:
+            raise ValueError(
+                f"JCL operand exceeds the 71-column limit and cannot be wrapped safely: {param[:40]}"
+            )
+        if current_line == prefix:
+            raise ValueError(
+                f"JCL operand cannot fit after the statement prefix: {param[:40]}"
+            )
+        if not current_line.endswith(","):
+            current_line += ","
+        lines.append(current_line)
+        current_line = continuation_candidate
 
     lines.append(current_line)
     return "\n".join(lines)
@@ -846,9 +862,7 @@ def build_step_jcl(step: Dict[str, Any], step_index: int = 1) -> str:
         sysin_cards = ""
         sysin_block = f"//{sysin_dd:<8} DD  DUMMY\n"
     else:
-        cleaned_sysin_lines = [
-            ln[:71] for ln in sysin_raw.splitlines() if ln.strip() != ""
-        ]
+        cleaned_sysin_lines = [ln for ln in sysin_raw.splitlines() if ln.strip() != ""]
         sysin_cards = "\n".join(cleaned_sysin_lines)
         sysin_content = f"*\n{sysin_cards}\n/*"
         sysin_block = f"//{sysin_dd:<8} DD  *\n{sysin_cards}\n/*\n"
@@ -945,13 +959,11 @@ def validate_strict_jcl(jcl_text: str) -> List[str]:
             )
 
         if in_instream_mode:
+            # In-stream content is data, even when a data card starts with "//".
+            # Only the JCL delimiter closes the data block.
             if line.startswith("/*"):
                 in_instream_mode = ""
-                continue
-            if in_instream_mode == "*" and line.startswith("//") and not line.startswith("//*"):
-                in_instream_mode = ""
-            else:
-                continue
+            continue
 
         if line.startswith("//*"):
             continue
