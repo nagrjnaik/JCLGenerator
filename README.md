@@ -211,10 +211,5 @@ deactivate
 
 ---
 
-## License
-
-MIT — free to use, modify, and distribute.
-
----
 
 *Developed by **Nagraj Naik***
