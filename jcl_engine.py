@@ -548,7 +548,7 @@ def sanitize_dsn(dsn: str) -> str:
     value = str(dsn).strip().upper()
     if any(ch in value for ch in "\r\n\x00"):
         raise ValueError("Dataset names must be a single line.")
-    if not re.fullmatch(r"(?:&&)?[A-Z0-9@#$][A-Z0-9@#$.-]*(?:\([A-Z0-9@#$]+\))?(?:\([+-]\\d+\))?", value):
+    if not re.fullmatch(r"(?:&&)?[A-Z0-9@#$][A-Z0-9@#$.-]*(?:\([A-Z0-9@#$]+\))?(?:\([+-]\d+\))?", value):
         raise ValueError(f"Invalid dataset reference: {value!r}")
     if len(value) > 54:
         raise ValueError("Dataset references must not exceed 54 characters.")
